@@ -292,6 +292,15 @@ void FullTest::onRun() {
         OATPP_ASSERT(dto->testValue == "my_test_header");
       }
 
+      {
+        try {
+          auto response = client->silentClose();
+          OATPP_ASSERT(response == nullptr);
+        } catch (const std::runtime_error &e) {
+
+        }
+      }
+
       { // test POST with body
         auto response = client->postBody("my_test_body", connection);
         OATPP_ASSERT(response->getStatusCode() == 200);

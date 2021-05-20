@@ -117,6 +117,9 @@ HttpProcessor::processNextRequest(ProcessingResources& resources,
   } catch (oatpp::web::protocol::http::HttpError& error) {
     response = resources.components->errorHandler->handleError(error.getInfo().status, error.getMessage(), error.getHeaders());
     connectionState = ConnectionState::CLOSING;
+  } catch (network::FatalConnectionError& error) {
+    response = nullptr;
+    connectionState = ConnectionState::DEAD;
   } catch (std::exception& error) {
     response = resources.components->errorHandler->handleError(protocol::http::Status::CODE_500, error.what());
     connectionState = ConnectionState::CLOSING;
@@ -154,6 +157,12 @@ HttpProcessor::ConnectionState HttpProcessor::processNextRequest(ProcessingResou
                                                               resources.components->bodyDecoder);
 
     response = processNextRequest(resources, request, connectionState);
+
+    // Silently close connection when endpoint returned a nullptr.
+    if (!response) {
+      connectionState = ConnectionState::DEAD;
+      return connectionState;
+    }
 
     try {
 
@@ -357,6 +366,10 @@ HttpProcessor::Coroutine::Action HttpProcessor::Coroutine::onRequestFormed() {
 }
 
 HttpProcessor::Coroutine::Action HttpProcessor::Coroutine::onResponse(const std::shared_ptr<protocol::http::outgoing::Response>& response) {
+  // Silently close connection when endpoint returned a nullptr.
+  if (!response) {
+    return finish();
+  }
   m_currentResponse = response;
   return yieldTo(&HttpProcessor::Coroutine::onResponseFormed);
 }
